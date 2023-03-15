@@ -1,15 +1,10 @@
 package org.example;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
-import jakarta.xml.bind.JAXBContext;
-import jakarta.xml.bind.JAXBException;
-import jakarta.xml.bind.Unmarshaller;
+import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 
-import javax.xml.stream.XMLInputFactory;
-import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamReader;
-import javax.xml.transform.stream.StreamSource;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -33,57 +28,55 @@ public class Main {
      * Сет возрастов для группировки
      */
     private static TreeSet<Integer> age = new TreeSet<>(List.of(20, 40, 60, 80));
+
     /**
      * Компаратор для класса Person
      */
-    private static final Comparator<Person> comparatorPerson =
-            Comparator.comparing(Person::getGender).thenComparing(Person::getAge).thenComparing(Person::getId);
-    private static final ObjectWriter objectWriter = new ObjectMapper().writer().withDefaultPrettyPrinter();
 
 
-    public static void main(String[] args) throws XMLStreamException, JAXBException, IOException {
+    public static void main(String[] args) throws IOException {
         loadProperties();
         List<Path> pathList = getPathsOfFiles(nameDirInput);
         for (Path path : pathList) {
-            Map<Gender, Map<Integer, Long>> collect = getPersonsFromXml(path, comparatorPerson).stream()
-                    .collect(Collectors.groupingBy(Person::getGender,
+            Map<Gender, Map<String, Long>> collect = getPersonsFromXml(path).stream()
+                    .collect(Collectors.groupingBy(
+                            person -> Objects.requireNonNullElse(person.getGender(), Gender.Absent),
                             Collectors.groupingBy(
-                                    person -> getNearestSmaller(age, person.getAge()), Collectors.counting())));
+                                    person -> getGroupAge(age, person.getAge()), Collectors.counting())));
             List<Result> results = getResult(collect);
             save(results, nameDirOutput, path.getFileName().toString());
         }
     }
 
-    public static List<Result> getResult(Map<Gender, Map<Integer, Long>> collect) {
+    public static List<Result> getResult(Map<Gender, Map<String, Long>> collect) {
         List<Result> results = new ArrayList<>();
         collect.forEach((gender, integerListMap) ->
                 integerListMap.forEach((groupAge, count) -> {
                     Result result = new Result();
                     result.setGender(gender);
                     result.setCount(count);
-                    String ageStr;
-                    if (groupAge >= 0) {
-                        try {
-                            ageStr = groupAge + "-" + (age.higher(groupAge) - 1);
-                        } catch (NullPointerException e) {
-                            ageStr = groupAge + "...";
-                        }
-                    } else {
-                        ageStr = "Без возраста";
-                    }
-                    result.setAge(ageStr);
+                    result.setAge(groupAge);
                     results.add(result);
                 }));
         return results;
     }
 
-    public static Integer getNearestSmaller(TreeSet<Integer> set, int value) {
-        Iterator<Integer> iterator = set.descendingIterator();
-        int result = iterator.next();
-        while (result > value) {
-            result = iterator.next();
+    public static String getGroupAge(TreeSet<Integer> set, Integer value) {
+        if (value == null) {
+            return "Без возраста";
+        } else {
+            Iterator<Integer> iterator = set.descendingIterator();
+            int groupAge = iterator.next();
+            while (groupAge > value) {
+                groupAge = iterator.next();
+            }
+            Optional<Integer> optional = Optional.ofNullable(age.higher(groupAge));
+            if (optional.isEmpty()) {
+                return groupAge + "...";
+            } else {
+                return groupAge + "-" + (optional.get() - 1);
+            }
         }
-        return result;
     }
 
     /**
@@ -107,6 +100,7 @@ public class Main {
         while (Files.exists(Path.of(path))) {
             path = nameDir + "/" + nameFile + "_" + count++ + ext;
         }
+        ObjectWriter objectWriter = new ObjectMapper().writer().withDefaultPrettyPrinter();
         Files.write(Path.of(path), objectWriter.writeValueAsBytes(data));
     }
 
@@ -145,33 +139,11 @@ public class Main {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Метод читает XML файл и отдает сортированный список
-     *
-     * @param path       путь к файлу
-     * @param comparator Компаратор для сортировки
-     * @return отдает сортированный список Person
-     */
-    public static TreeSet<Person> getPersonsFromXml(Path path, Comparator<Person> comparator) throws JAXBException, XMLStreamException {
-        JAXBContext jc = JAXBContext.newInstance(Person.class);
-        XMLInputFactory xif = XMLInputFactory.newFactory();
-        StreamSource xml = new StreamSource(path.toString());
-        XMLStreamReader xsr = xif.createXMLStreamReader(xml);
-        TreeSet<Person> persons = new TreeSet<>(comparator);
-        Unmarshaller unmarshaller = jc.createUnmarshaller();
-        while (xsr.getEventType() != XMLStreamReader.END_DOCUMENT) {
-            if (xsr.isStartElement() && "person".equals(xsr.getLocalName())) {
-                Person person = (Person) unmarshaller.unmarshal(xsr);
-                if (person.getAge() == null) {
-                    person.setAge(-1);
-                }
-                if (person.getGender() == null) {
-                    person.setGender(Gender.Absent);
-                }
-                persons.add(person);
-            }
-            xsr.next();
-        }
-        return persons;
+
+    public static List<Person> getPersonsFromXml(Path path) throws IOException {
+        File file = new File(String.valueOf(path));
+        XmlMapper xmlMapper = new XmlMapper();
+        return xmlMapper.readValue(file, new TypeReference<>() {
+        });
     }
 }
