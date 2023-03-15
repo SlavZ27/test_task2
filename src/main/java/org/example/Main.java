@@ -56,21 +56,24 @@ public class Main {
 
     public static List<Result> getResult(Map<Gender, Map<Integer, Long>> collect) {
         List<Result> results = new ArrayList<>();
-        collect.forEach((gender, integerListMap) -> {
-            integerListMap.forEach((groupAge, count) -> {
-                Result result = new Result();
-                result.setGender(gender);
-                result.setCount(count);
-                String ageStr;
-                if (groupAge > 0) {
-                    ageStr = age.lower(groupAge) + "-" + groupAge;
-                } else {
-                    ageStr = "Без возраста";
-                }
-                result.setAge(ageStr);
-                results.add(result);
-            });
-        });
+        collect.forEach((gender, integerListMap) ->
+                integerListMap.forEach((groupAge, count) -> {
+                    Result result = new Result();
+                    result.setGender(gender);
+                    result.setCount(count);
+                    String ageStr;
+                    if (groupAge >= 0) {
+                        try {
+                            ageStr = groupAge + "-" + (age.higher(groupAge) - 1);
+                        } catch (NullPointerException e) {
+                            ageStr = groupAge + "...";
+                        }
+                    } else {
+                        ageStr = "Без возраста";
+                    }
+                    result.setAge(ageStr);
+                    results.add(result);
+                }));
         return results;
     }
 
@@ -89,7 +92,6 @@ public class Main {
      * @param data     объект для сохранения
      * @param nameDir  папка для сохранения
      * @param nameFile имя файла для сохранения
-     * @throws IOException
      */
     public static void save(List<Result> data, String nameDir, String nameFile) throws IOException {
         File directory = new File(nameDir);
@@ -110,8 +112,6 @@ public class Main {
 
     /**
      * Метод ищет файл настроек и переопределяет переменные
-     *
-     * @throws IOException
      */
     public static void loadProperties() throws IOException {
         Properties props = new Properties();
@@ -133,7 +133,7 @@ public class Main {
     /**
      * Метод ищет файлы в указанной папке
      *
-     * @param pathDir
+     * @param pathDir папка для сканирования файлов
      * @return список путей файлов из папки
      */
     public static List<Path> getPathsOfFiles(String pathDir) {
@@ -151,8 +151,6 @@ public class Main {
      * @param path       путь к файлу
      * @param comparator Компаратор для сортировки
      * @return отдает сортированный список Person
-     * @throws JAXBException
-     * @throws XMLStreamException
      */
     public static TreeSet<Person> getPersonsFromXml(Path path, Comparator<Person> comparator) throws JAXBException, XMLStreamException {
         JAXBContext jc = JAXBContext.newInstance(Person.class);
