@@ -1,14 +1,26 @@
 package org.example;
 
 
+import jakarta.xml.bind.annotation.XmlAccessType;
+import jakarta.xml.bind.annotation.XmlAccessorType;
+import jakarta.xml.bind.annotation.XmlElement;
+import jakarta.xml.bind.annotation.XmlRootElement;
+
 import java.io.Serializable;
 import java.util.Objects;
 
+@XmlRootElement(name = "person")
+@XmlAccessorType(XmlAccessType.FIELD)
 public class Person implements Serializable {
+    @XmlElement
     private Long id;
+    @XmlElement
     private String name;
+    @XmlElement
     private Gender gender;
+    @XmlElement
     private Integer age;
+    @XmlElement
     private String address;
 
     public Long getId() {

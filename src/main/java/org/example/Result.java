@@ -29,6 +29,10 @@ public class Result {
         this.count = count;
     }
 
+    public void countInc() {
+        count++;
+    }
+
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
